@@ -12,8 +12,8 @@ model_path = "../deepseek-r1-qwen32b"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    device_map="auto"
+    torch_dtype=torch.float16,
+    device_map={"": "cuda:0"}  # Tvinga till GPU
 )
 
 class PromptRequest(BaseModel):
@@ -35,7 +35,7 @@ def generate(req: PromptRequest):
         "input_ids": inputs["input_ids"],
         "attention_mask": inputs["attention_mask"],
         "max_new_tokens": req.max_tokens,
-        "do_sample": True,  # gör att den inte försöker vara deterministisk
+        "do_sample": True,
         "eos_token_id": tokenizer.eos_token_id,
         "pad_token_id": tokenizer.pad_token_id,
         "streamer": streamer
