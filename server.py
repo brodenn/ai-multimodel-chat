@@ -1,8 +1,12 @@
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
-import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    TextIteratorStreamer,
+    BitsAndBytesConfig
+)
 import threading
 
 app = FastAPI()
@@ -10,11 +14,21 @@ app = FastAPI()
 # Modell och tokenizer
 model_path = "../deepseek-r1-qwen32b"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+# Konfiguration för 4‑bit kvantisering med bitsandbytes
+quant_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype="fp16"
+)
+
+# Ladda modellen med auto device mapping
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    torch_dtype=torch.float16
+    quantization_config=quant_config,
+    device_map="auto",
+    torch_dtype="auto"
 )
-model.to("cuda")  # Tvinga ner hela modellen till GPU
 
 class PromptRequest(BaseModel):
     prompt: str = "Vad är meningen med livet?"
