@@ -7,7 +7,7 @@ import threading
 
 app = FastAPI()
 
-# Ladda modellen
+# Modell och tokenizer
 model_path = "../deepseek-r1-qwen32b"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
@@ -17,26 +17,31 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 class PromptRequest(BaseModel):
-    prompt: str
+    prompt: str = "Vad är meningen med livet?"
     max_tokens: int = 200
 
 @app.post("/generate")
 def generate(req: PromptRequest):
-    # Tokenisera och flytta till rätt enhet
     inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
 
-    # Skapa en streamer som fångar tokens live
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    # Skapa streamer
+    streamer = TextIteratorStreamer(
+        tokenizer,
+        skip_prompt=True,
+        skip_special_tokens=True
+    )
 
-    # Starta genereringen i bakgrunden
     generation_kwargs = {
-        **inputs,
+        "input_ids": inputs["input_ids"],
+        "attention_mask": inputs["attention_mask"],
         "max_new_tokens": req.max_tokens,
+        "do_sample": True,  # gör att den inte försöker vara deterministisk
+        "eos_token_id": tokenizer.eos_token_id,
+        "pad_token_id": tokenizer.pad_token_id,
         "streamer": streamer
     }
 
     thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
     thread.start()
 
-    # Returnera stream till klienten
     return StreamingResponse(streamer, media_type="text/plain")
