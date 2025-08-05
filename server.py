@@ -12,9 +12,9 @@ model_path = "../deepseek-r1-qwen32b"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    torch_dtype=torch.float16,
-    device_map={"": "cuda:0"}  # Tvinga till GPU
+    torch_dtype=torch.float16
 )
+model.to("cuda")  # Tvinga ner hela modellen till GPU
 
 class PromptRequest(BaseModel):
     prompt: str = "Vad är meningen med livet?"
@@ -22,16 +22,9 @@ class PromptRequest(BaseModel):
 
 @app.post("/generate")
 def generate(req: PromptRequest):
-    inputs = tokenizer(req.prompt, return_tensors="pt").to(model.device)
-
-    # Skapa streamer
-    streamer = TextIteratorStreamer(
-        tokenizer,
-        skip_prompt=True,
-        skip_special_tokens=True
-    )
-
-    generation_kwargs = {
+    inputs = tokenizer(req.prompt, return_tensors="pt").to("cuda")
+    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    params = {
         "input_ids": inputs["input_ids"],
         "attention_mask": inputs["attention_mask"],
         "max_new_tokens": req.max_tokens,
@@ -40,8 +33,6 @@ def generate(req: PromptRequest):
         "pad_token_id": tokenizer.pad_token_id,
         "streamer": streamer
     }
-
-    thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
+    thread = threading.Thread(target=model.generate, kwargs=params)
     thread.start()
-
     return StreamingResponse(streamer, media_type="text/plain")
