@@ -12,13 +12,13 @@ from pathlib import Path
 
 app = FastAPI()
 
-# Korrekt modellväg (lokal sökväg måste vara utan ./)
+# Modellväg
 model_path = Path("../deepseek-r1-distill").resolve()
 
 # Tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
-# Välj datatyp baserat på GPU-stöd
+# Välj enhet & precision
 if torch.cuda.is_available():
     dtype = torch.float16
     device = torch.device("cuda")
@@ -37,10 +37,14 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 model.eval()
 
+# Inmatningsmodell
 class PromptRequest(BaseModel):
     prompt: str = "Vad är meningen med livet?"
     max_tokens: int = 200
+    temperature: float = 0.7
+    top_p: float = 0.9
 
+# API-endpoint
 @app.post("/generate")
 def generate(req: PromptRequest):
     inputs = tokenizer(req.prompt, return_tensors="pt").to(device)
@@ -51,9 +55,12 @@ def generate(req: PromptRequest):
         "attention_mask": inputs["attention_mask"],
         "max_new_tokens": req.max_tokens,
         "do_sample": True,
+        "temperature": req.temperature,
+        "top_p": req.top_p,
         "eos_token_id": tokenizer.eos_token_id,
         "pad_token_id": tokenizer.pad_token_id,
-        "streamer": streamer
+        "streamer": streamer,
+        "use_cache": True
     }
 
     thread = threading.Thread(target=model.generate, kwargs=gen_args)
