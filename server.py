@@ -13,7 +13,7 @@ from pathlib import Path
 app = FastAPI()
 
 # Korrekt modellväg (lokal sökväg måste vara utan ./)
-model_path = Path("deepseek-r1-distill").resolve()
+model_path = Path("../deepseek-r1-distill").resolve()
 
 # Tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
