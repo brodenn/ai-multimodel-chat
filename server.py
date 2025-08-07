@@ -11,8 +11,8 @@ import threading
 
 app = FastAPI()
 
-# Modellväg (justera om din ligger på annan plats)
-model_path = "../deepseek-r1-qwen32b"
+# Ändra till distill-versionen
+model_path = "./deepseek-r1-distill"
 
 # Tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
