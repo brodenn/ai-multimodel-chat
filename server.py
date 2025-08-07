@@ -8,11 +8,12 @@ from transformers import (
 )
 import torch
 import threading
+from pathlib import Path
 
 app = FastAPI()
 
-# Ändra till distill-versionen
-model_path = "./deepseek-r1-distill"
+# Korrekt modellväg (lokal sökväg måste vara utan ./)
+model_path = Path("deepseek-r1-distill").resolve()
 
 # Tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -36,12 +37,10 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 model.eval()
 
-# Pydantic-modell för förfrågan
 class PromptRequest(BaseModel):
     prompt: str = "Vad är meningen med livet?"
     max_tokens: int = 200
 
-# Genererings-API
 @app.post("/generate")
 def generate(req: PromptRequest):
     inputs = tokenizer(req.prompt, return_tensors="pt").to(device)
@@ -57,7 +56,6 @@ def generate(req: PromptRequest):
         "streamer": streamer
     }
 
-    # Starta generering i separat tråd
     thread = threading.Thread(target=model.generate, kwargs=gen_args)
     thread.start()
 
