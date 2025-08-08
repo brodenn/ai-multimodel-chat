@@ -1,4 +1,16 @@
 fastapi
 uvicorn
+
+# Modell
 transformers
 torch
+
+# Upload & dokument
+python-multipart
+pypdf
+python-docx
+
+# RAG / embeddings / index
+faiss-cpu
+sentence-transformers
+numpy
