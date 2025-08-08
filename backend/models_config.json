@@ -1,0 +1,18 @@
+{
+  "deepseek-r1-distill": {
+    "path": "/home/aiuser/models/deepseek-r1-distill",
+    "type": "general"
+  },
+  "qwen3-coder-30b-a3b": {
+    "path": "/home/aiuser/models/qwen3-coder-30b-a3b",
+    "type": "coding"
+  },
+  "qwen3-30b-a3b-2507": {
+    "path": "/home/aiuser/models/qwen3-30b-a3b-2507",
+    "type": "reasoning"
+  },
+  "gpt-oss-20b": {
+    "path": "/home/aiuser/models/gpt-oss-20b",
+    "type": "mixed"
+  }
+}

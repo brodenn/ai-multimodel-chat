@@ -1,53 +1,40 @@
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    TextIteratorStreamer
-)
-import torch
 import threading
-from pathlib import Path
+import torch
+from transformers import TextIteratorStreamer
+from utils.model_loader import load_model, get_active_model
+from utils.prompt_utils import format_prompt
 
 app = FastAPI()
 
-# Modellväg
-model_path = Path("../deepseek-r1-distill").resolve()
+# Ladda första modellen direkt (DeepSeek)
+load_model("deepseek-r1-distill")
 
-# Tokenizer
-tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-
-# Välj enhet & precision
-if torch.cuda.is_available():
-    dtype = torch.float16
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    dtype = torch.float16
-    device = torch.device("mps")
-else:
-    dtype = torch.float32
-    device = torch.device("cpu")
-
-# Ladda modellen
-model = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    torch_dtype=dtype,
-    device_map="auto" if device.type != "cpu" else None
-)
-model.eval()
-
-# Inmatningsmodell
 class PromptRequest(BaseModel):
-    prompt: str = "Vad är meningen med livet?"
+    prompt: str
     max_tokens: int = 200
     temperature: float = 0.7
     top_p: float = 0.9
+    history: list = None
 
-# API-endpoint
+class ModelSwitchRequest(BaseModel):
+    model_name: str
+
+@app.post("/switch_model")
+def switch_model(req: ModelSwitchRequest):
+    load_model(req.model_name)
+    return {"status": "ok", "active_model": req.model_name}
+
 @app.post("/generate")
 def generate(req: PromptRequest):
-    inputs = tokenizer(req.prompt, return_tensors="pt").to(device)
+    model, tokenizer, model_name = get_active_model()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    full_prompt = format_prompt(req.prompt, req.history)
+    inputs = tokenizer(full_prompt, return_tensors="pt").to(device)
+
     streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
     gen_args = {
