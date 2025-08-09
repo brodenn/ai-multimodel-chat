@@ -2,32 +2,44 @@ import React, { useState } from "react";
 import MessageBubble from "./MessageBubble";
 import { sendMessage, uploadFile, askFile } from "../services/api";
 
-export default function ChatWindow() {
+export default function ChatWindow({ model }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
 
   const [fileInfo, setFileInfo] = useState(null); // { file_id, filename }
   const [questionMode, setQuestionMode] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const historyPairs = () => messages.map(m => [m.role, m.text]);
+  const historyPairs = () => messages.map((m) => [m.role, m.text]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || sending) return;
 
-    const newMessages = [...messages, { role: "User", text: input }];
+    const userMsg = { role: "User", text: input };
+    const newMessages = [...messages, userMsg];
     setMessages(newMessages);
+
     const currentInput = input;
     setInput("");
+    setSending(true);
 
-    let reply = "";
-    if (questionMode && fileInfo?.file_id) {
-      reply = await askFile(fileInfo.file_id, currentInput, historyPairs());
-    } else {
-      reply = await sendMessage(currentInput, historyPairs());
+    try {
+      let reply = "";
+      if (questionMode && fileInfo?.file_id) {
+        reply = await askFile(fileInfo.file_id, currentInput, historyPairs(), model);
+      } else {
+        reply = await sendMessage(currentInput, historyPairs(), model);
+      }
+      setMessages((prev) => [...prev, { role: "AI", text: reply }]);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "AI", text: `⚠️ Fel: ${e.message || "Okänt fel"}` },
+      ]);
+    } finally {
+      setSending(false);
     }
-
-    setMessages(prev => [...prev, { role: "AI", text: reply }]);
   };
 
   const handleUpload = async (e) => {
@@ -65,6 +77,9 @@ export default function ChatWindow() {
             Aktiv fil: <b>{fileInfo.filename}</b>
           </span>
         )}
+        <span className="ml-auto text-xs text-gray-400">
+          Modell: <b>{model}</b>
+        </span>
       </div>
 
       {/* Chat content */}
@@ -81,13 +96,19 @@ export default function ChatWindow() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           className="flex-1 p-2 rounded bg-gray-700 text-white"
-          placeholder={questionMode ? "Ställ en fråga om dokumentet..." : "Skriv ett meddelande..."}
+          placeholder={
+            questionMode
+              ? "Ställ en fråga om dokumentet..."
+              : "Skriv ett meddelande..."
+          }
+          disabled={sending}
         />
         <button
           onClick={handleSend}
-          className="ml-2 bg-blue-500 px-4 py-2 rounded text-white"
+          className="ml-2 bg-blue-500 px-4 py-2 rounded text-white disabled:opacity-60"
+          disabled={sending}
         >
-          Skicka
+          {sending ? "Skickar..." : "Skicka"}
         </button>
       </div>
     </div>

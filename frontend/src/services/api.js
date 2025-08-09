@@ -18,9 +18,12 @@ function ensureOk(res) {
 // Streama text (server-sent plain text)
 export async function streamToText(res, signal) {
   ensureOk(res);
+  if (!res.body) throw new Error("Saknar response body (stream).");
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let output = "";
+
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -32,12 +35,18 @@ export async function streamToText(res, signal) {
   return output;
 }
 
+/**
+ * Skicka ett vanligt chat-meddelande till /generate, med valfri historik.
+ * Viktigt: skicka alltid model_name så frontendets val används per request.
+ */
 export async function sendMessage(prompt, history = [], model) {
   const controller = new AbortController();
+
   const res = await fetch(`${API}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, history, model }),
+    // Backend förväntar { prompt, history, model_name }
+    body: JSON.stringify({ prompt, history, model_name: model }),
     signal: controller.signal,
   }).catch((e) => {
     // Vanligt i browsern: adblock eller fel host → net::ERR_BLOCKED_BY_CLIENT / TypeError: Failed to fetch
@@ -52,6 +61,9 @@ export async function sendMessage(prompt, history = [], model) {
   }
 }
 
+/**
+ * Byt aktiv modell globalt i backend (valfritt om du skickar model_name per request).
+ */
 export async function switchModel(modelName) {
   const res = await fetch(`${API}/switch_model`, {
     method: "POST",
@@ -63,6 +75,9 @@ export async function switchModel(modelName) {
   return ensureOk(res).json();
 }
 
+/**
+ * Ladda upp en fil till /upload. Backend svarar med { file_id, filename }.
+ */
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);
@@ -72,15 +87,42 @@ export async function uploadFile(file) {
   return ensureOk(res).json(); // { file_id, filename }
 }
 
+/**
+ * Ställ en fråga om en tidigare uppladdad fil via /ask_file.
+ * Skicka med model_name för att styra modellen per request.
+ */
 export async function askFile(file_id, question, history = [], model) {
   const res = await fetch(`${API}/ask_file`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_id, question, history, model }),
+    // Backend förväntar { file_id, question, history, model_name }
+    body: JSON.stringify({ file_id, question, history, model_name: model }),
   }).catch((e) => {
     throw new Error(`Kunde inte fråga på fil: ${e.message}`);
   });
   return streamToText(res);
+}
+
+// (Valfritt) Små hjälpare om du vill visa status i UI
+export async function getHealth() {
+  const res = await fetch(`${API}/health`).catch((e) => {
+    throw new Error(`Health-check misslyckades: ${e.message}`);
+  });
+  return ensureOk(res).json();
+}
+
+export async function getModels() {
+  const res = await fetch(`${API}/models`).catch((e) => {
+    throw new Error(`Hämtning av modeller misslyckades: ${e.message}`);
+  });
+  return ensureOk(res).json();
+}
+
+export async function getActiveModel() {
+  const res = await fetch(`${API}/active_model`).catch((e) => {
+    throw new Error(`Hämtning av aktiv modell misslyckades: ${e.message}`);
+  });
+  return ensureOk(res).json();
 }
 
 // Exportera bas-URL om du vill logga/debugga
